@@ -5,9 +5,9 @@ import { NewsService } from './news.service';
 export class NewsController {
   constructor(private readonly newsService: NewsService) {}
 
-  // נקודת קצה לקבלת החדשות
   @Get()
-  getNews() {
-    return this.newsService.getNews();
+  async getNews() {
+    const messages = await this.newsService.consumeMessages();
+    return messages;
   }
 }

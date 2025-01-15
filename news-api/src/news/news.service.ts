@@ -1,27 +1,39 @@
 import { Injectable } from '@nestjs/common';
-import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
+import * as amqp from 'amqplib';
 
 @Injectable()
 export class NewsService {
-  private newsItems: any[] = []; // שמירת הנתונים שהתקבלו בזיכרון
+  private readonly RABBITMQ_URL = 'amqp://localhost';
+  private readonly QUEUE_NAME = 'news_queue_1';
 
-  // מאזין ל-RabbitMQ עבור הודעות בתור 'news_queue_1'
-  @EventPattern('news_queue_1') // שם התור צריך להתאים להגדרה ב-RabbitMQ וב-Python
-  async handleNewsMessage(@Payload() data: any, @Ctx() context: RmqContext) {
-      console.log('Received news item:', data);
-      
-      // שמור את הנתונים
-      this.newsItems.push(data);
-  
-      // אשר את קבלת ההודעה
-      const channel = context.getChannelRef();
-      const originalMessage = context.getMessage();
-      channel.ack(originalMessage);
-  }
-  
+  async consumeMessages(): Promise<any[]> {
+    const connection = await amqp.connect(this.RABBITMQ_URL);
+    const channel = await connection.createChannel();
 
-  // פונקציה להחזרת החדשות המאוחסנות
-  getNews() {
-    return this.newsItems;
+    await channel.assertQueue(this.QUEUE_NAME, { durable: true });
+
+    const messages = [];
+    await new Promise<void>((resolve) => {
+      channel.consume(
+        this.QUEUE_NAME,
+        (msg) => {
+          if (msg) {
+            const content = JSON.parse(msg.content.toString());
+            messages.push(content);
+            channel.ack(msg);
+          }
+        },
+        { noAck: false }
+      );
+
+      // לאחר מספר שניות עוצרים את הצריכה
+      setTimeout(() => {
+        resolve();
+        channel.close();
+        connection.close();
+      }, 5000); // 5 שניות לצריכת הודעות
+    });
+
+    return messages;
   }
 }

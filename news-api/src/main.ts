@@ -1,24 +1,20 @@
 import { NestFactory } from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // חיבור ל-RabbitMQ
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.RMQ,
-    options: {
-      urls: ['amqp://localhost:5672'], // כתובת RabbitMQ
-      queue: 'news_queue_1', // שם ה-Queue
-      queueOptions: {
-        durable: true, // התאמה ל-Queue מוגדר עם durable
-      },
-    },
-  });
-  
+  // Enable Swagger
+  const config = new DocumentBuilder()
+    .setTitle('News API')
+    .setDescription('API documentation for the News Service')
+    .setVersion('1.0')
+    .build();
 
-  await app.startAllMicroservices(); // הפעלת המיקרוסרביסים
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
+
   await app.listen(3000);
 }
 bootstrap();
